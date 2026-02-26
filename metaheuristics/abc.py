@@ -73,7 +73,7 @@ class ABC:
             # Update global best
             best_idx = np.argmin(self.fitness)
             if self.fitness[best_idx] < self.best_fitness:
-                self.best_solution = self.pop[best_idx]
+                self.best_solution = self.pop[best_idx].copy()
                 self.best_fitness = self.fitness[best_idx]
 
             # Save history

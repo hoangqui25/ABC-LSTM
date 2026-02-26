@@ -12,7 +12,6 @@ from keras.callbacks import EarlyStopping
 from datasets.stock import StockDataset
 from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_absolute_percentage_error, r2_score
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Test")
 
@@ -114,12 +113,12 @@ if __name__ == '__main__':
     train_y, test_y = stock.split_dataset(data_y, 0.8)
 
     # Scaling X (features)
-    scaler_x = MinMaxScaler(feature_range=(0,1))
+    scaler_x = MinMaxScaler(feature_range=(0, 1))
     train_x_scaled = scaler_x.fit_transform(train_x)
     test_x_scaled = scaler_x.transform(test_x)
 
     # Scaling Y (close)
-    scaler_y = MinMaxScaler()
+    scaler_y = MinMaxScaler(feature_range=(0, 1))
     train_y_scaled = scaler_y.fit_transform(train_y.reshape(-1, 1)).flatten()
     test_y_scaled = scaler_y.transform(test_y.reshape(-1, 1)).flatten()
 
@@ -133,45 +132,80 @@ if __name__ == '__main__':
     test_x_concat = np.concatenate((last_train_x, test_x_scaled), axis=0)
     test_y_concat = np.concatenate((last_train_y, test_y_scaled), axis=0)
     x_test, y_test = stock.create_dataset(test_x_concat, test_y_concat, look_back)
-    
-    final_model = lstm(input_shape=input_shape, params=best_params)
-    final_model.compile(optimizer=Adam(lr), loss='mse')
-    
-    final_model.fit(
-        x_train, y_train,
-        epochs=optimal_epoch,
-        batch_size=args.batch_size,
-        verbose=1
-    )
 
-    print("\n[Phase 3] Predicting on Test set...")
-    pred_y_scaled = final_model.predict(x_test)
-    
-    # Inverse transform predictions
-    y_pred = scaler_y.inverse_transform(pred_y_scaled.reshape(-1, 1)).flatten()
-    y_test_actual = scaler_y.inverse_transform(y_test.reshape(-1, 1)).flatten()
+    # --- VÒNG LẶP 10 LẦN TEST ---
+    all_results = []
+    save_fig_dir = f"figures/{args.symbol.upper()}"
+    os.makedirs(save_fig_dir, exist_ok=True)
 
-    # Metrics
-    mae = mean_absolute_error(y_test_actual, y_pred)
-    mse = mean_squared_error(y_test_actual, y_pred)
-    rmse = np.sqrt(mse)
-    mape = mean_absolute_percentage_error(y_test_actual, y_pred)
-    r2 = r2_score(y_test_actual, y_pred)
+    for i in range(1, 11):
+        print(f"\n>>> RUN {i}/10 (Epochs: {optimal_epoch})")
+        
+        # Phase 2: Retrain
+        final_model = lstm(input_shape=input_shape, params=best_params)
+        final_model.compile(optimizer=Adam(lr), loss='mse')
+        final_model.fit(
+            x_train, y_train,
+            epochs=optimal_epoch,
+            batch_size=args.batch_size,
+            verbose=1
+        )
 
-    print(f"MAE  : {mae:.2f}")
-    print(f"RMSE : {rmse:.2f}")
-    print(f"MAPE : {mape * 100:.4f} ({mape * 100:.2f}%)")
-    print(f"R2   : {r2:.4f}")
+        # Phase 3: Predict
+        pred_y_scaled = final_model.predict(x_test)
+    
+        # Inverse transform predictions
+        y_pred = scaler_y.inverse_transform(pred_y_scaled.reshape(-1, 1)).flatten()
+        y_test_actual = scaler_y.inverse_transform(y_test.reshape(-1, 1)).flatten()
 
-    # Plot
-    plt.figure(figsize=(12,6))
-    plt.title(args.symbol.upper())
-    plt.plot(y_test_actual, color='cornflowerblue', label="Actual Price")
+        # Metrics
+        mae = mean_absolute_error(y_test_actual, y_pred)
+        mse = mean_squared_error(y_test_actual, y_pred)
+        rmse = np.sqrt(mse)
+        mape = mean_absolute_percentage_error(y_test_actual, y_pred)
+        r2 = r2_score(y_test_actual, y_pred)
+        # Metrics
+        res = {
+            "MAE": float(mae),
+            "RMSE": float(rmse),
+            "MAPE": float(mape * 100),
+            "R2": float(r2),
+            "Epoch_Used": int(optimal_epoch)
+        }
+        all_results.append(res)
+        print(f"Metrics: MAE={res['MAE']:.2f}, R2={res['R2']:.4f}")
+
+        # Plot
+        plt.figure(figsize=(12,6))
+        plt.title(args.symbol.upper())
+        plt.plot(y_test_actual, color='cornflowerblue', label="Actual Price")
+        
+        label_name = "LSTM" if args.metaheuristic == 'none' else f"{args.metaheuristic.upper()}-LSTM"
+        plt.plot(y_pred, color='orange', label=label_name)
+        
+        plt.xlabel('Date')
+        plt.ylabel('Close')
+        plt.legend()
+        plt.savefig(f"{save_fig_dir}/{i}.png")
+        plt.close()
+
+    # --- LOGGING ---
+    log_dir = f"logs/{args.symbol.upper()}"
+    os.makedirs(log_dir, exist_ok=True)
     
-    label_name = "LSTM" if args.metaheuristic == 'none' else f"{args.metaheuristic.upper()}-LSTM"
-    plt.plot(y_pred, color='orange', label=label_name)
+    log_data = {
+        "symbol": args.symbol,
+        "optimal_epoch": int(optimal_epoch),
+        "average_metrics": {
+            "MAE": float(np.mean([r['MAE'] for r in all_results])),
+            "RMSE": float(np.mean([r['RMSE'] for r in all_results])),
+            "MAPE": float(np.mean([r['MAPE'] for r in all_results])),
+            "R2": float(np.mean([r['R2'] for r in all_results]))
+        },
+        "runs": all_results
+    }
+
+    with open(f"{log_dir}/test_log.json", "w") as f:
+        json.dump(log_data, f, indent=4)
     
-    plt.xlabel('Date')
-    plt.ylabel('Close')
-    plt.legend()
-    plt.show()
+    print(f"\n✅ Done! 10 runs used the same {optimal_epoch} epochs.")

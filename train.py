@@ -3,12 +3,13 @@ import json
 import time
 import argparse
 import numpy as np
+from scipy.signal import savgol_filter
 from sklearn.preprocessing import MinMaxScaler
 from metaheuristics.sma import SMA
 from metaheuristics.abc import ABC
 from metaheuristics.aro import ARO
-from fitness.fitness import Fitness
-from datasets.vnstock import VnStockDataset
+from losses.loss import Loss
+from datasets.stock import StockDataset
 from utils.config import cfg
 
 
@@ -21,7 +22,7 @@ def parse_args():
                         help='start date for fetching stock data (format: YYYY-MM-DD)')
     parser.add_argument('--end', type=str, default='2025-01-01', 
                         help='end date for fetching stock data (format: YYYY-MM-DD)')
-    parser.add_argument('--look-back', type=int, default=60, 
+    parser.add_argument('--look-back', type=int, default=30, 
                         help='number of previous days used as input for LSTM model')
     parser.add_argument('--metaheuristic', type=str,
                         choices=['abc', 'sma', 'aro'],
@@ -44,30 +45,40 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     
-    stock = VnStockDataset(args.symbol)
-    features = ['open', 'high', 'low', 'close', 'volume']
-    data, data_close, close_col = stock.load_dataset(start=args.start, end=args.end, features=features, target_feature='close')
+    stock = StockDataset(args.symbol)
+    features = ['Open', 'High', 'Low', 'Close', 'Volume']
+    data_x, data_y = stock.load_dataset(start=args.start, end=args.end, features=features, target_feature='Close')
     
     look_back = args.look_back
 
-    train, val, _ = stock.split_dataset(data=data, train_ratio=0.65, val_ratio=0.15)
-    train_close, val_close, _ = stock.split_dataset(data=data_close, train_ratio=0.65, val_ratio=0.15)
+    train_x, val_x, _ = stock.split_dataset(data=data_x, train_ratio=0.65, val_ratio=0.15)
+    train_y, val_y, _ = stock.split_dataset(data=data_y, train_ratio=0.65, val_ratio=0.15)
 
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaler_close = MinMaxScaler(feature_range=(0, 1))
+    # Scaling X (features)
+    scaler_x = MinMaxScaler(feature_range=(0, 1))
+    train_x_scaled = scaler_x.fit_transform(train_x)
+    val_x_scaled = scaler_x.transform(val_x)
 
-    train = scaler.fit_transform(train)
-    val = scaler.transform(val)
-    scaler_close.fit(train_close.reshape(-1, 1))
+    # Scaling Y (close)
+    scaler_y = MinMaxScaler(feature_range=(0, 1))
+    train_y_scaled = scaler_y.fit_transform(train_y.reshape(-1, 1)).flatten()
+    val_y_scaled = scaler_y.transform(val_y.reshape(-1, 1)).flatten()
 
-    x_train, y_train = stock.create_dataset(train, look_back, close_col)
-    past_days = train[-look_back:]
-    val = np.concatenate([past_days, val])
-    x_val, y_val = stock.create_dataset(val, look_back, close_col)
+    # Train
+    train_y_smoothed = savgol_filter(train_y_scaled, window_length=9, polyorder=3)
+    x_train, y_train = stock.create_dataset(train_x_scaled, train_y_smoothed, look_back)
+    
+    # Val
+    last_train_x = train_x_scaled[-look_back:]
+    last_train_y = train_y_scaled[-look_back:]
+    val_x_concat = np.concatenate((last_train_x, val_x_scaled), axis=0)
+    val_y_concat = np.concatenate((last_train_y, val_y_scaled), axis=0)
+    x_val, y_val = stock.create_dataset(val_x_concat, val_y_concat, look_back)
 
     input_shape = (x_train.shape[1], x_train.shape[2])
 
-    fitness = Fitness(
+    # Metaheuristic
+    loss = Loss(
         input_shape=input_shape, 
         x_train=x_train, 
         y_train=y_train, 
@@ -79,7 +90,7 @@ if __name__ == '__main__':
 
     if args.metaheuristic == 'abc':
         metaheuristic = ABC(
-            obj_func=fitness.evulate, 
+            obj_func=loss.evaluate, 
             lb=cfg['lb'], ub=cfg['ub'],  
             pop_size=args.pop_size, 
             epochs=args.metaheuristic_epoch,
@@ -87,14 +98,14 @@ if __name__ == '__main__':
         )
     elif args.metaheuristic == 'sma':
         metaheuristic = SMA(
-            obj_func=fitness.evulate, 
+            obj_func=loss.evaluate, 
             lb=cfg['lb'], ub=cfg['ub'], 
             pop_size=args.pop_size, 
             epochs=args.metaheuristic_epoch
         )
     elif args.metaheuristic == 'aro':
         metaheuristic = ARO(
-            obj_func=fitness.evulate, 
+            obj_func=loss.evaluate, 
             lb=cfg['lb'], ub=cfg['ub'], 
             pop_size=args.pop_size, 
             epochs=args.metaheuristic_epoch
@@ -106,6 +117,7 @@ if __name__ == '__main__':
 
     run_time = end - start
     
+    # Result
     print("Run time: ", run_time)
     print("History: ", history)
     print("Best parameters:", best_params)

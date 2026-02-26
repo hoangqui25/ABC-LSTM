@@ -1,10 +1,10 @@
+import numpy as np
+
 def decode(x):
-    neurons = int(round(x[0]))
-    dropout = float(x[1])
-    epochs = int(round(x[2]))
+    neurons = np.round(x[0:3]).astype(int)
+    dropout = np.round(x[3]).astype(int)
     
     return {
-        "epochs": epochs,
         "neurons": neurons,
         "dropout": dropout,
     }
