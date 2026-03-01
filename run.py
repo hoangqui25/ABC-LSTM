@@ -133,7 +133,7 @@ if __name__ == '__main__':
     test_y_concat = np.concatenate((last_train_y, test_y_scaled), axis=0)
     x_test, y_test = stock.create_dataset(test_x_concat, test_y_concat, look_back)
 
-    # --- VÒNG LẶP 10 LẦN TEST ---
+    # --- Test for 10 times ---
     all_results = []
     save_fig_dir = f"figures/{args.symbol.upper()}"
     os.makedirs(save_fig_dir, exist_ok=True)
