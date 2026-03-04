@@ -12,6 +12,7 @@ from keras.callbacks import EarlyStopping
 from datasets.stock import StockDataset
 from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_absolute_percentage_error, r2_score
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Test")
 
@@ -208,4 +209,4 @@ if __name__ == '__main__':
     with open(f"{log_dir}/test_log.json", "w") as f:
         json.dump(log_data, f, indent=4)
     
-    print(f"\n✅ Done! 10 runs used the same {optimal_epoch} epochs.")
+    print(f"\n Done! 10 runs used the {optimal_epoch} epochs.")
