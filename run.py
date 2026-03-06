@@ -12,6 +12,7 @@ from keras.callbacks import EarlyStopping
 from datasets.stock import StockDataset
 from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_absolute_percentage_error, r2_score
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Test")
 
@@ -133,7 +134,7 @@ if __name__ == '__main__':
     test_y_concat = np.concatenate((last_train_y, test_y_scaled), axis=0)
     x_test, y_test = stock.create_dataset(test_x_concat, test_y_concat, look_back)
 
-    # --- VÒNG LẶP 10 LẦN TEST ---
+    # --- Test for 10 times ---
     all_results = []
     save_fig_dir = f"figures/{args.symbol.upper()}"
     os.makedirs(save_fig_dir, exist_ok=True)
@@ -208,4 +209,4 @@ if __name__ == '__main__':
     with open(f"{log_dir}/test_log.json", "w") as f:
         json.dump(log_data, f, indent=4)
     
-    print(f"\n✅ Done! 10 runs used the same {optimal_epoch} epochs.")
+    print(f"\n Done! 10 runs used the {optimal_epoch} epochs.")
