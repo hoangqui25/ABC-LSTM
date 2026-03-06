@@ -168,7 +168,7 @@ if __name__ == '__main__':
         res = {
             "MAE": float(mae),
             "RMSE": float(rmse),
-            "MAPE": float(mape * 100),
+            "MAPE": float(mape),
             "R2": float(r2),
             "Epoch_Used": int(optimal_epoch)
         }
