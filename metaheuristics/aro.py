@@ -18,7 +18,7 @@ class ARO:
         best_idx = np.argmin(self.fitness)
         self.best_solution = self.pop[best_idx].copy()
         self.best_fitness = self.fitness[best_idx]
-    
+
     def correct_solution(self, sol):
         return np.clip(sol, self.lb, self.ub)
 
@@ -38,8 +38,8 @@ class ARO:
 
                 if A > 1:  # Detour foraging
                     j = np.random.randint(self.pop_size)
-                    new_pos = (self.pop[j] 
-                               + R * (self.pop[i] - self.pop[j]) 
+                    new_pos = (self.pop[j]
+                               + R * (self.pop[i] - self.pop[j])
                                + np.round(0.5 * (0.05 + np.random.rand())) * np.random.normal(0, 1))
                 else:  # Random hiding
                     g = np.zeros(self.n_dims)

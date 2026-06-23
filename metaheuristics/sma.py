@@ -17,7 +17,7 @@ class SMA:
         self.pop = np.random.uniform(lb, ub, (pop_size, self.n_dims))
         self.fitness = np.apply_along_axis(self.obj_func, 1, self.pop)
 
-        # Find the best soulution 
+        # Find the best soulution
         self.best_solution = self.pop[np.argmin(self.fitness)]
         self.best_fitness = np.min(self.fitness)
 
@@ -28,7 +28,7 @@ class SMA:
         for i in range(self.pop_size):
             if new_fit[i] < self.fitness[i]:
                 self.pop[i] = new_pop[i]
-                self.fitness[i] = new_fit[i] 
+                self.fitness[i] = new_fit[i]
 
     def solve(self):
         history = []
@@ -60,7 +60,7 @@ class SMA:
             bb = 1 - ep / self.epochs
 
             # new_pop = np.zeros_like(self.pop)
-                
+
             for i in range(self.pop_size):
                 if self.rng.random() < self.p_t:  # Eq.(2.7)
                     pos_new = self.lb + (self.ub - self.lb) * self.rng.random(self.n_dims)

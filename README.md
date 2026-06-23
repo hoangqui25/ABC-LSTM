@@ -1,4 +1,4 @@
-# Artificial Bee Colony Long Short-Term Memory 
+# Artificial Bee Colony Long Short-Term Memory
 ### Stock Price Prediction Using Deep LSTM Network Optimized with Artificial Bee Colony Algorithm
 
 ## Code
@@ -29,5 +29,5 @@ python test.py --symbol <symbol of company> --metaheuristic <metaheuristic algor
 
 ## License
 
-MIT LICENSE 
+MIT LICENSE
 Copyright © 2025 Qui Hoang, Chau Nguyen, Nghia Tran
