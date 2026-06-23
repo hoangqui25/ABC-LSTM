@@ -7,12 +7,12 @@ from utils.decode import decode
 class Surrogate:
     def __init__(self, log_file):
         self.log_file = log_file
-        
+
         self._ensure_dir()
 
         self.model = RandomForestRegressor(n_estimators=100, n_jobs=-1, random_state=42)
-        self.is_ready = False 
-        
+        self.is_ready = False
+
         self.load_history()
 
     def _ensure_dir(self):
@@ -39,13 +39,13 @@ class Surrogate:
             if df is None:
                 if not self._check_file_valid(): return
                 df = pd.read_csv(self.log_file)
-            
-            df = df.dropna() # Remove invalid rows
-            if len(df) < 20: return
 
-            X = df.iloc[:, :-1].values 
-            y = df.iloc[:, -1].values  
-            
+            df = df.dropna() # Remove invalid rows
+            if len(df) < 100: return
+
+            X = df.iloc[:, :-1].values
+            y = df.iloc[:, -1].values
+
             self.model.fit(X, y)
             self.is_ready = True
         except Exception as e:
@@ -59,16 +59,16 @@ class Surrogate:
     def save_result(self, params, actual_loss):
         try:
             self._ensure_dir()
-            params = decode(params)
-            params_list = params['neurons'].tolist() + [params['dropout']]
+            decoded = decode(params)
+            params_list = [decoded['layers']] + decoded['neurons'] + [decoded['dropout'], decoded['lr']]
             new_row = params_list + [actual_loss]
             df_new = pd.DataFrame([new_row])
-            
+
             file_exists = os.path.exists(self.log_file)
             df_new.to_csv(self.log_file, mode='a', header=not file_exists, index=False)
-            
+
             self.train_model()
-                    
+
         except Exception as e:
             print(f"[Surrogate] Error saving result: {e}")
 
