@@ -16,11 +16,11 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_absolu
 def parse_args():
     parser = argparse.ArgumentParser(description="Test")
 
-    parser.add_argument('--symbol', type=str, 
+    parser.add_argument('--symbol', type=str,
                         help='stock symbol to fetch')
-    parser.add_argument('--start', type=str, default='2018-01-01', 
+    parser.add_argument('--start', type=str, default='2018-01-01',
                         help='start date for fetching stock data (format: YYYY-MM-DD)')
-    parser.add_argument('--end', type=str, default='2025-01-01', 
+    parser.add_argument('--end', type=str, default='2025-01-01',
                         help='end date for fetching stock data (format: YYYY-MM-DD)')
     parser.add_argument('--look-back', type=int, default=30,
                         help='number of previous days used as input for LSTM model')
@@ -29,11 +29,9 @@ def parse_args():
                         help='metaheuristic algorithm used to optimize LSTM hyperparameters')
     parser.add_argument('--batch-size', type=int, default=32,
                         help='batch size for LSTM training')
-    parser.add_argument('--learning-rate', type=float, default=0.001,
-                        help='learning rate for Adam optimizer')
     parser.add_argument('--load-dir', type=str, default='parameters',
                         help='directory to load parameters')
-    
+
     args = parser.parse_args()
     return args
 
@@ -61,7 +59,7 @@ if __name__ == '__main__':
     # Train
     train_y_smoothed = savgol_filter(train_y_scaled, window_length=9, polyorder=3)
     x_train, y_train = stock.create_dataset(train_x_scaled, train_y_smoothed, look_back)
-    
+
     # Val
     last_train_x = train_x_scaled[-look_back:]
     last_train_y = train_y_scaled[-look_back:]
@@ -81,24 +79,24 @@ if __name__ == '__main__':
 
 
     print("\n[Phase 1] Searching for optimal epochs...")
-    
-    temp_model = lstm(input_shape=input_shape, params=best_params)
-    lr = best_params.get('learning_rate', args.learning_rate)
+
+    temp_model = lstm(input_shape=input_shape, decoded_params=best_params)
+    lr = best_params.get('lr')
     temp_model.compile(optimizer=Adam(lr), loss='mse')
 
     early_stop = EarlyStopping(
-        monitor='val_loss', 
-        patience=20, 
+        monitor='val_loss',
+        patience=5,
         restore_best_weights=True)
-    
+
     history = temp_model.fit(
-        x_train, y_train, 
+        x_train, y_train,
         validation_data=(x_val, y_val),
-        epochs=100, 
+        epochs=50,
         batch_size=args.batch_size,
         verbose=1
     )
-    
+
     val_loss_history = history.history['val_loss']
     optimal_epoch = np.argmin(val_loss_history) + 1 # Plus one because index starts from zero
     print(f"--> Found Optimal Epoch: {optimal_epoch}")
@@ -126,7 +124,7 @@ if __name__ == '__main__':
     # Train
     train_y_smoothed = savgol_filter(train_y_scaled, window_length=9, polyorder=3)
     x_train, y_train = stock.create_dataset(train_x_scaled, train_y_smoothed, look_back)
-    
+
     # Test
     last_train_x = train_x_scaled[-look_back:]
     last_train_y = train_y_scaled[-look_back:]
@@ -141,9 +139,9 @@ if __name__ == '__main__':
 
     for i in range(1, 11):
         print(f"\n>>> RUN {i}/10 (Epochs: {optimal_epoch})")
-        
+
         # Phase 2: Retrain
-        final_model = lstm(input_shape=input_shape, params=best_params)
+        final_model = lstm(input_shape=input_shape, decoded_params=best_params)
         final_model.compile(optimizer=Adam(lr), loss='mse')
         final_model.fit(
             x_train, y_train,
@@ -154,7 +152,7 @@ if __name__ == '__main__':
 
         # Phase 3: Predict
         pred_y_scaled = final_model.predict(x_test)
-    
+
         # Inverse transform predictions
         y_pred = scaler_y.inverse_transform(pred_y_scaled.reshape(-1, 1)).flatten()
         y_test_actual = scaler_y.inverse_transform(y_test.reshape(-1, 1)).flatten()
@@ -180,10 +178,10 @@ if __name__ == '__main__':
         plt.figure(figsize=(12,6))
         plt.title(args.symbol.upper())
         plt.plot(y_test_actual, color='cornflowerblue', label="Actual Price")
-        
+
         label_name = "LSTM" if args.metaheuristic == 'none' else f"{args.metaheuristic.upper()}-LSTM"
         plt.plot(y_pred, color='orange', label=label_name)
-        
+
         plt.xlabel('Date')
         plt.ylabel('Close')
         plt.legend()
@@ -193,7 +191,7 @@ if __name__ == '__main__':
     # --- LOGGING ---
     log_dir = f"logs/{args.symbol.upper()}"
     os.makedirs(log_dir, exist_ok=True)
-    
+
     log_data = {
         "symbol": args.symbol,
         "optimal_epoch": int(optimal_epoch),
@@ -208,5 +206,5 @@ if __name__ == '__main__':
 
     with open(f"{log_dir}/test_log.json", "w") as f:
         json.dump(log_data, f, indent=4)
-    
+
     print(f"\n Done! 10 runs used the {optimal_epoch} epochs.")

@@ -1,8 +1,10 @@
 import os
 import json
 import time
+import random
 import argparse
 import numpy as np
+import tensorflow as tf
 from scipy.signal import savgol_filter
 from sklearn.preprocessing import MinMaxScaler
 from metaheuristics.sma import SMA
@@ -10,45 +12,48 @@ from metaheuristics.abc import ABC
 from metaheuristics.aro import ARO
 from losses.loss import Loss
 from datasets.stock import StockDataset
-from utils.config import cfg
+from utils.decode import cfg
 
+
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+tf.random.set_seed(SEED)
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train")
 
-    parser.add_argument('--symbol', type=str, 
+    parser.add_argument('--symbol', type=str,
                         help='stock symbol to fetch')
-    parser.add_argument('--start', type=str, default='2018-01-01', 
+    parser.add_argument('--start', type=str, default='2018-01-01',
                         help='start date for fetching stock data (format: YYYY-MM-DD)')
-    parser.add_argument('--end', type=str, default='2025-01-01', 
+    parser.add_argument('--end', type=str, default='2025-01-01',
                         help='end date for fetching stock data (format: YYYY-MM-DD)')
-    parser.add_argument('--look-back', type=int, default=30, 
+    parser.add_argument('--look-back', type=int, default=30,
                         help='number of previous days used as input for LSTM model')
     parser.add_argument('--metaheuristic', type=str,
                         choices=['abc', 'sma', 'aro'],
                         help='metaheuristic algorithm used to optimize LSTM hyperparameters')
-    parser.add_argument('--metaheuristic-epoch', type=int, default=20,
+    parser.add_argument('--metaheuristic-epoch', type=int, default=50,
                         help='number of iterations for metaheuristic')
-    parser.add_argument('--pop-size', type=int, default=10,
-                        help='population size of SMA optimizer')
-    parser.add_argument('--batch-size', type=int, default=32,
+    parser.add_argument('--pop-size', type=int, default=20,
+                        help='population size of optimizer')
+    parser.add_argument('--batch-size', type=int, default=64,
                         help='batch size for LSTM training')
-    parser.add_argument('--learning-rate', type=float, default=0.001,
-                        help='learning rate for Adam optimizer')
     parser.add_argument('--save-dir', type=str, default='parameters',
                         help='directory to save best parameters')
-    
+
     args = parser.parse_args()
     return args
 
 
 if __name__ == '__main__':
     args = parse_args()
-    
+
     stock = StockDataset(args.symbol)
     features = ['Open', 'High', 'Low', 'Close', 'Volume']
     data_x, data_y = stock.load_dataset(start=args.start, end=args.end, features=features, target_feature='Close')
-    
+
     look_back = args.look_back
 
     train_x, val_x, _ = stock.split_dataset(data=data_x, train_ratio=0.65, val_ratio=0.15)
@@ -67,7 +72,7 @@ if __name__ == '__main__':
     # Train
     train_y_smoothed = savgol_filter(train_y_scaled, window_length=9, polyorder=3)
     x_train, y_train = stock.create_dataset(train_x_scaled, train_y_smoothed, look_back)
-    
+
     # Val
     last_train_x = train_x_scaled[-look_back:]
     last_train_y = train_y_scaled[-look_back:]
@@ -79,44 +84,43 @@ if __name__ == '__main__':
 
     # Metaheuristic
     loss = Loss(
-        input_shape=input_shape, 
-        x_train=x_train, 
-        y_train=y_train, 
-        x_val=x_val, 
+        input_shape=input_shape,
+        x_train=x_train,
+        y_train=y_train,
+        x_val=x_val,
         y_val=y_val,
         batch_size=args.batch_size,
-        learning_rate=args.learning_rate
     )
 
     if args.metaheuristic == 'abc':
         metaheuristic = ABC(
-            obj_func=loss.evaluate, 
-            lb=cfg['lb'], ub=cfg['ub'],  
-            pop_size=args.pop_size, 
+            obj_func=loss.evaluate,
+            lb=cfg['lb'], ub=cfg['ub'],
+            pop_size=args.pop_size,
             epochs=args.metaheuristic_epoch,
             limits=(0.2 * args.metaheuristic_epoch)
         )
     elif args.metaheuristic == 'sma':
         metaheuristic = SMA(
-            obj_func=loss.evaluate, 
-            lb=cfg['lb'], ub=cfg['ub'], 
-            pop_size=args.pop_size, 
+            obj_func=loss.evaluate,
+            lb=cfg['lb'], ub=cfg['ub'],
+            pop_size=args.pop_size,
             epochs=args.metaheuristic_epoch
         )
     elif args.metaheuristic == 'aro':
         metaheuristic = ARO(
-            obj_func=loss.evaluate, 
-            lb=cfg['lb'], ub=cfg['ub'], 
-            pop_size=args.pop_size, 
+            obj_func=loss.evaluate,
+            lb=cfg['lb'], ub=cfg['ub'],
+            pop_size=args.pop_size,
             epochs=args.metaheuristic_epoch
         )
-    
+
     start = time.time()
     best_params, best_score, history = metaheuristic.solve()
     end = time.time()
 
     run_time = end - start
-    
+
     # Result
     print("Run time: ", run_time)
     print("History: ", history)
