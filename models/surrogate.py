@@ -28,9 +28,8 @@ class Surrogate:
         if self._check_file_valid():
             try:
                 df = pd.read_csv(self.log_file)
-                if len(df) >= 20:
-                    self.train_model(df)
-                    print(f"[Surrogate] Restored memory from {len(df)} historical samples.")
+                self.train_model(df)
+                print(f"[Surrogate] Restored memory from {len(df)} historical samples.")
             except Exception as e:
                 print(f"[Surrogate] Warning: Failed to read history file ({e})")
 
@@ -41,7 +40,7 @@ class Surrogate:
                 df = pd.read_csv(self.log_file)
 
             df = df.dropna() # Remove invalid rows
-            if len(df) < 100: return
+            if len(df) < 150: return
 
             X = df.iloc[:, :-1].values
             y = df.iloc[:, -1].values
