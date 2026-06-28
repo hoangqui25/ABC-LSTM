@@ -73,7 +73,14 @@ if __name__ == '__main__':
 
     with open(params_path, "r") as f:
         config = json.load(f)
-    best_params = decode(config["best_params"])
+
+    # Check if decoded_params exists in file, otherwise decode from best_params
+    if "decoded_params" in config:
+        decoded_params = config["decoded_params"]
+        best_params = decoded_params
+    else:
+        best_params = decode(config["best_params"])
+
     input_shape = (x_train.shape[1], x_train.shape[2])
     print(f"Loaded params: {best_params}")
 

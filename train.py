@@ -12,7 +12,7 @@ from metaheuristics.abc import ABC
 from metaheuristics.aro import ARO
 from losses.loss import Loss
 from datasets.stock import StockDataset
-from utils.decode import cfg
+from utils.decode import cfg, decode
 
 
 SEED = 42
@@ -133,10 +133,19 @@ if __name__ == '__main__':
     best_params_serializable = best_params.tolist()
     best_score_serializable = float(best_score)
 
+    decoded_params = decode(best_params)
+
     with open(save_path, "w") as f:
         json.dump({
             "best_params": best_params_serializable,
-            "best_scores": best_score_serializable
+            "best_scores": best_score_serializable,
+            "decoded_params": {
+                "layers": decoded_params["layers"],
+                "neurons": decoded_params["neurons"],
+                "dropout": decoded_params["dropout"],
+                "lr": decoded_params["lr"]
+            },
+            "train_time": run_time
         }, f, indent=4)
 
     print(f"Saved best parameters and best score to {save_path}")

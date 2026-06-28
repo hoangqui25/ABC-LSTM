@@ -73,16 +73,22 @@ if __name__ == '__main__':
 
     with open(params_path, "r") as f:
         config = json.load(f)
-    best_params = decode(config["best_params"])
+
+    # Check if decoded_params exists in file, otherwise decode from best_params
+    if "decoded_params" in config:
+        decoded_params = config["decoded_params"]
+        best_params = decoded_params
+    else:
+        best_params = decode(config["best_params"])
+
     input_shape = (x_train.shape[1], x_train.shape[2])
     print(f"Loaded params: {best_params}")
-
 
     print("\n[Phase 1] Searching for optimal epochs...")
 
     temp_model = lstm(input_shape=input_shape, decoded_params=best_params)
-    lr = best_params.get('lr')
-    temp_model.compile(optimizer=Adam(lr), loss='mse')
+    lr = best_params.get('lr', 0.001)
+    temp_model.compile(optimizer=Adam(learning_rate=lr), loss='mse')
 
     early_stop = EarlyStopping(
         monitor='val_loss',
